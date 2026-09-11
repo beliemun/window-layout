@@ -4,7 +4,7 @@ import ServiceManagement
 struct PopoverView: View {
     @ObservedObject var model: LayoutModel
 
-    static let width: CGFloat = 540
+    static let width: CGFloat = 640
     static let padding: CGFloat = 14
     static let tileSpacing: CGFloat = 8
 

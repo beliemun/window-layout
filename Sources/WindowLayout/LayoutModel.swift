@@ -54,6 +54,33 @@ struct LayoutSpec: Hashable, Identifiable {
             cells: cells
         )
     }
+
+    /// rows개 행 중 한쪽 끝 행이 가로 100%를 차지하고, 나머지 행은 cols열로 나뉜다.
+    /// 셀 수 = 1 + (rows - 1) * cols  (예: rows 4, cols 2 → 7칸). 세로 모니터용.
+    static func fullRow(onTop: Bool, rows: Int, cols: Int) -> LayoutSpec {
+        let h = 1.0 / Double(rows)
+        let w = 1.0 / Double(cols)
+        var cells: [LayoutCell] = []
+
+        // 가로 100% 행
+        let fullY = onTop ? 0.0 : 1.0 - h
+        cells.append(LayoutCell(x: 0, y: fullY, w: 1, h: h))
+
+        // 나머지 행을 cols열로 분할 (행 우선)
+        let range = onTop ? 1..<rows : 0..<(rows - 1)
+        for r in range {
+            for c in 0..<cols {
+                cells.append(LayoutCell(x: Double(c) * w, y: Double(r) * h, w: w, h: h))
+            }
+        }
+
+        let side = onTop ? "위" : "아래"
+        return LayoutSpec(
+            id: "fullrow-\(onTop ? "t" : "b")-\(rows)x\(cols)",
+            name: "\(side) 전체 너비 + \(rows - 1)×\(cols)",
+            cells: cells
+        )
+    }
 }
 
 extension LayoutSpec {
@@ -142,21 +169,24 @@ enum LayoutOrientation: String, CaseIterable, Identifiable {
                 .fullColumn(onLeft: false, cols: 4, rows: 2),
             ]
         case .portrait:
+            // 마지막 둘은 한쪽 끝 행이 가로 100%인 7칸 레이아웃(위/아래)
             return [
                 .grid(rows: 2, cols: 1), .grid(rows: 3, cols: 1), .grid(rows: 4, cols: 1),
                 .grid(rows: 2, cols: 2), .grid(rows: 3, cols: 2), .grid(rows: 4, cols: 2),
+                .fullRow(onTop: true, rows: 4, cols: 2),
+                .fullRow(onTop: false, rows: 4, cols: 2),
             ]
         }
     }
 
     /// 한 줄에 놓을 타일 수. 세로 탭은 6개를 한 줄에 모두 놓는다.
-    var tilesPerRow: Int { self == .landscape ? 5 : 6 }
+    var tilesPerRow: Int { self == .landscape ? 5 : 8 }
 
     /// 타일의 셀 영역 크기(카드 패딩 제외). 가로는 16:9, 세로는 9:16.
     var tileSize: CGSize {
         switch self {
-        case .landscape: return CGSize(width: 84, height: 47)
-        case .portrait:  return CGSize(width: 66, height: 117)
+        case .landscape: return CGSize(width: 104, height: 58)
+        case .portrait:  return CGSize(width: 57, height: 101)
         }
     }
 }
