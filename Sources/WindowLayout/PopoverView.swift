@@ -4,7 +4,7 @@ import ServiceManagement
 struct PopoverView: View {
     @ObservedObject var model: LayoutModel
 
-    static let width: CGFloat = 500
+    static let width: CGFloat = 540
     static let padding: CGFloat = 14
     static let tileSpacing: CGFloat = 8
 
@@ -214,16 +214,18 @@ struct LayoutTile: View {
         let dy: CGFloat = cellArea.height * CGFloat(cell.y) + cellGap / 2
         let fill: Color = hoveredIndex == index ? Color.accentColor : Color.primary.opacity(0.16)
 
+        // 히트 영역은 .offset 앞에서 정해야 한다. .offset 뒤에 contentShape를 붙이면
+        // 클릭·호버 영역이 이동 전(레이아웃) 위치에 남아 엉뚱한 자리에서 반응한다.
         return RoundedRectangle(cornerRadius: 3, style: .continuous)
             .fill(fill)
             .frame(width: width, height: height)
-            .offset(x: dx, y: dy)
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside { hoveredIndex = index }
                 else if hoveredIndex == index { hoveredIndex = nil }
             }
             .onTapGesture { onSelect(cell) }
+            .offset(x: dx, y: dy)
     }
 
     private var cardBackground: some View {

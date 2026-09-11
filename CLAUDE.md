@@ -34,7 +34,9 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
   (`NSWorkspace.didActivateApplicationNotification`, 자기 자신 제외), 간격 설정(UserDefaults `gap`)
 - `WindowMover.swift` — 포커스 창 조회, 창이 놓인 화면의 `visibleFrame`에 비율 셀을 대입(`frame(in:cell:gap:)`),
   Cocoa(좌하단 원점)↔AX(좌상단 원점, 기준은 `NSScreen.screens[0]`) 좌표 변환, 위치→크기→위치 순 적용
-- `PopoverView.swift` — 팝오버 UI. 헤더(앱 + 캡슐 탭 `OrientationTabs`), 카드형 타일 `GridTile`, 설정 그룹(`GapStepper`, `LoginItemToggle`), 푸터(버전 + 종료). 구분선(Divider) 사용하지 않음. **LazyVGrid 금지**(표시 후 크기가 바뀌어 팝오버가 잘림)
+- `PopoverView.swift` — 팝오버 UI. 헤더(앱 + 캡슐 탭 `OrientationTabs`), 카드형 타일 `LayoutTile`, 설정 그룹(`GapStepper`, `LoginItemToggle`), 푸터(버전 + 종료). 구분선(Divider) 사용하지 않음.
+  타일 안의 셀은 `.offset`으로 배치한다. **히트 영역(`contentShape`/`onHover`/`onTapGesture`)은 반드시 `.offset` 앞에**
+  붙여야 한다. 뒤에 붙이면 클릭·호버가 이동 전 레이아웃 위치에서 반응한다. **LazyVGrid 금지**(표시 후 크기가 바뀌어 팝오버가 잘림)
 - `Info.plist` — 번들 ID `com.brian.windowlayout`, `LSUIElement=true`, `CFBundleIconFile=AppIcon`
 - `Resources/AppIcon.icns` — `scripts/make_icon.swift`가 그린 생성물
 

@@ -86,14 +86,14 @@ enum LayoutOrientation: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 한 줄에 놓을 타일 수
-    var tilesPerRow: Int { self == .landscape ? 5 : 3 }
+    /// 한 줄에 놓을 타일 수. 세로 탭은 6개를 한 줄에 모두 놓는다.
+    var tilesPerRow: Int { self == .landscape ? 5 : 6 }
 
     /// 타일의 셀 영역 크기(카드 패딩 제외). 가로는 16:9, 세로는 9:16.
     var tileSize: CGSize {
         switch self {
-        case .landscape: return CGSize(width: 76, height: 43)
-        case .portrait:  return CGSize(width: 112, height: 199)
+        case .landscape: return CGSize(width: 84, height: 47)
+        case .portrait:  return CGSize(width: 66, height: 117)
         }
     }
 }
