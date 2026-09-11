@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -9,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AccessibilityAccess.requestIfNeeded()
+        enableLaunchAtLoginByDefault()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
@@ -25,6 +27,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.contentViewController = hosting
 
         model.onApplied = { [weak self] in self?.popover.performClose(nil) }
+    }
+
+    /// 첫 실행 시 로그인 항목을 기본으로 등록한다. 이후에는 사용자가 팝오버에서 바꾼 값을 존중한다.
+    private func enableLaunchAtLoginByDefault() {
+        let key = "launchAtLoginConfigured"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        do {
+            try SMAppService.mainApp.register()
+            UserDefaults.standard.set(true, forKey: key)
+        } catch {
+            NSLog("launch at login register failed: \(error.localizedDescription)")
+        }
     }
 
     @objc private func togglePopover(_ sender: Any?) {

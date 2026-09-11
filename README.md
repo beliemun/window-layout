@@ -43,7 +43,7 @@ macOS 13+, Xcode 또는 Command Line Tools(`swift`, `codesign`, `iconutil`).
 
 ## 팝오버 하단 설정
 - 창 간격(px): 슬라이더 또는 −/+ 버튼
-- 로그인 시 자동 실행 토글
+- 로그인 시 자동 실행 토글 (첫 실행 시 기본 켜짐, UserDefaults `launchAtLoginConfigured`)
 
 ## 검증
 ```sh

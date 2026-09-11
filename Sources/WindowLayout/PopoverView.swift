@@ -155,7 +155,8 @@ struct GapRow: View {
             Text("창 간격").font(.system(size: 15))
             Spacer()
             stepButton("minus") { gap = max(0, gap - 1) }
-            Slider(value: $gap, in: 0...32, step: 1)
+            // step:을 주면 macOS 슬라이더가 눈금(점)을 그리므로, 눈금 없이 값만 정수로 반올림한다.
+            Slider(value: Binding(get: { gap }, set: { gap = $0.rounded() }), in: 0...32)
                 .frame(width: 110)
             stepButton("plus") { gap = min(32, gap + 1) }
             Text("\(Int(gap)) px")
