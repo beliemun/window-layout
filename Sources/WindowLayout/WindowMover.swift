@@ -42,7 +42,15 @@ enum WindowMover {
             width: a.width * cell.w,
             height: a.height * cell.h
         ).insetBy(dx: gap / 2, dy: gap / 2)
-        return rect.integral
+
+        // 각 변을 반올림한다. CGRect.integral은 바깥으로 올림해서 칸이 1~2px씩 커지고
+        // 이웃한 창끼리 겹친다(예: 4열이면 한 칸 폭이 427.5px).
+        // 맞닿은 변은 같은 값으로 반올림되므로 겹치지도, 틈이 생기지도 않는다.
+        let left = rect.minX.rounded()
+        let bottom = rect.minY.rounded()
+        let right = rect.maxX.rounded()
+        let top = rect.maxY.rounded()
+        return CGRect(x: left, y: bottom, width: right - left, height: top - bottom)
     }
 
     private static var primaryHeight: CGFloat {
@@ -190,5 +198,13 @@ enum WindowMover {
         AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
         AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
         AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
+
+        // 크기 변경을 늦게 반영하는 앱이 있어 한 번 더 확인하고 맞춘다.
+        // (창 자체의 최소 크기 때문에 못 맞추는 경우는 그대로 둔다)
+        if let current = axFrame(of: window),
+           abs(current.width - rect.width) > 1 || abs(current.height - rect.height) > 1 {
+            AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
+        }
     }
 }

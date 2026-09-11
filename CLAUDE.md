@@ -9,7 +9,7 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
 ## 명령
 | 목적 | 명령 |
 |---|---|
-| 빌드+설치+실행 | `./build.sh install` → `/Applications/WindowLayout.app` |
+| 빌드+설치+실행 (기본) | `./build.sh install` → `/Applications/WindowLayout.app` |
 | 빌드만 | `./build.sh` → `dist/WindowLayout.app` |
 | 아이콘 재생성 | `./scripts/build_icon.sh` (build.sh가 없으면 자동 호출) |
 | 권한 꼬임 초기화 | `./scripts/reset_permission.sh` |
@@ -41,6 +41,11 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
   붙여야 한다. 뒤에 붙이면 클릭·호버가 이동 전 레이아웃 위치에서 반응한다. **LazyVGrid 금지**(표시 후 크기가 바뀌어 팝오버가 잘림)
 - `Info.plist` — 번들 ID `com.brian.windowlayout`, `LSUIElement=true`, `CFBundleIconFile=AppIcon`
 - `Resources/AppIcon.icns` — `scripts/make_icon.swift`가 그린 생성물
+
+## 작업 규칙
+**코드를 고쳤으면 항상 `./build.sh install`로 다시 설치한다.** 빌드만 하고 끝내지 않는다.
+사용자는 `/Applications/WindowLayout.app`으로 바로 확인하므로, 설치되지 않으면 고친 것이 없는 것과 같다.
+설치 후 팝오버 푸터의 버전이 방금 빌드한 값인지 확인하고, 이어서 커밋·푸시·릴리스까지 진행한다.
 
 ## 설치가 반영되지 않을 때
 `pkill` 직후 바로 `open`하면 이전 프로세스가 아직 살아 있어 **새 바이너리가 실행되지 않고 기존 앱이 활성화만 된다.**
