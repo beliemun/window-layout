@@ -28,7 +28,7 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
 - `Sources/WindowLayout/main.swift` — 진입점, `.accessory` 정책(독 아이콘 없음, `LSUIElement`)
 - `AppDelegate.swift` — 상태바 아이템, NSPopover. 팝오버 크기는 표시 직전에
   `hosting.sizeThatFits`로 고정(`sizingOptions = []`). 이걸 풀면 팝오버가 위로 밀려 잘린다.
-- `LayoutModel.swift` — 그리드 정의(윗줄 1×2·1×3·1×4, 아랫줄 2×2·2×3·2×4, `tilesPerRow`로 줄당 개수 조절), 대상 앱 추적
+- `LayoutModel.swift` — 그리드 정의(윗줄 1×2·1×3·1×4, 아랫줄 2×2·2×3·2×4, `tilesPerRow`로 줄당 개수 조절; 맨 오른쪽 세로 타일은 `portraitGrids`(4×2)), 대상 앱 추적
   (`NSWorkspace.didActivateApplicationNotification`, 자기 자신 제외), 간격 설정(UserDefaults `gap`)
 - `WindowMover.swift` — 포커스 창 조회, 창이 놓인 화면의 `visibleFrame`을 rows×cols로 분할,
   Cocoa(좌하단 원점)↔AX(좌상단 원점, 기준은 `NSScreen.screens[0]`) 좌표 변환, 위치→크기→위치 순 적용

@@ -15,6 +15,10 @@ final class LayoutModel: ObservableObject {
     ]
     /// 팝오버 한 줄에 놓을 타일 수
     static let tilesPerRow = 3
+    /// 팝오버 맨 오른쪽에 세로로 길게 놓는 그리드(세로 모니터용). 두 줄 높이를 차지한다.
+    static let portraitGrids: [GridSpec] = [
+        GridSpec(rows: 4, cols: 2),
+    ]
 
     @Published var targetApp: NSRunningApplication?
     @Published var accessibilityGranted = AXIsProcessTrusted()

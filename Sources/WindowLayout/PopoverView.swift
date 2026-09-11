@@ -4,7 +4,10 @@ import ServiceManagement
 struct PopoverView: View {
     @ObservedObject var model: LayoutModel
 
-    static let width: CGFloat = 400
+    static let width: CGFloat = 500
+    static let tileHeight: CGFloat = 88
+    static let tileSpacing: CGFloat = 12
+    static let portraitTileWidth: CGFloat = 84
 
     /// tilesPerRow개씩 묶어 줄을 만든다.
     private var gridRows: [[GridSpec]] {
@@ -23,14 +26,24 @@ struct PopoverView: View {
             }
 
             // LazyVGrid는 팝오버 표시 후에 크기를 늦게 보고해 팝오버가 위로 밀리므로 사용하지 않는다.
-            VStack(spacing: 12) {
-                ForEach(gridRows, id: \.self) { line in
-                    HStack(spacing: 12) {
-                        ForEach(line) { grid in
-                            GridTile(grid: grid) { row, col in
-                                model.apply(grid: grid, row: row, col: col)
+            HStack(alignment: .top, spacing: Self.tileSpacing) {
+                VStack(spacing: Self.tileSpacing) {
+                    ForEach(gridRows, id: \.self) { line in
+                        HStack(spacing: Self.tileSpacing) {
+                            ForEach(line) { grid in
+                                GridTile(grid: grid, height: Self.tileHeight) { row, col in
+                                    model.apply(grid: grid, row: row, col: col)
+                                }
                             }
                         }
+                    }
+                }
+                // 세로 모니터용 그리드: 두 줄 높이의 세로 타일
+                let portraitHeight = Self.tileHeight * CGFloat(gridRows.count)
+                    + Self.tileSpacing * CGFloat(max(gridRows.count - 1, 0))
+                ForEach(LayoutModel.portraitGrids) { grid in
+                    GridTile(grid: grid, height: portraitHeight, width: Self.portraitTileWidth) { row, col in
+                        model.apply(grid: grid, row: row, col: col)
                     }
                 }
             }
@@ -86,6 +99,8 @@ struct PopoverView: View {
 /// rows×cols 그리드 하나. 각 셀을 클릭하면 onSelect(row, col)이 호출된다.
 struct GridTile: View {
     let grid: GridSpec
+    var height: CGFloat = 88
+    var width: CGFloat? = nil
     let onSelect: (Int, Int) -> Void
 
     @State private var hovered: (row: Int, col: Int)? = nil
@@ -102,7 +117,7 @@ struct GridTile: View {
                 }
             }
         }
-        .frame(height: 88)
+        .frame(width: width, height: height)
     }
 
     private func cell(row: Int, col: Int) -> some View {
