@@ -1,25 +1,112 @@
 import AppKit
 import Combine
 
-struct GridSpec: Hashable, Identifiable {
-    let rows: Int
-    let cols: Int
-    var id: String { "\(rows)x\(cols)" }
+/// 화면을 0...1 비율로 나눈 한 칸. 원점은 좌상단.
+struct LayoutCell: Hashable {
+    let x: Double
+    let y: Double
+    let w: Double
+    let h: Double
+}
+
+/// 레이아웃 하나. 균등 그리드도, 한 열이 세로 100%를 차지하는 형태도 셀 목록으로 표현한다.
+struct LayoutSpec: Hashable, Identifiable {
+    let id: String
+    let name: String
+    let cells: [LayoutCell]
+
+    /// rows×cols 균등 그리드
+    static func grid(rows: Int, cols: Int) -> LayoutSpec {
+        let w = 1.0 / Double(cols)
+        let h = 1.0 / Double(rows)
+        var cells: [LayoutCell] = []
+        for r in 0..<rows {
+            for c in 0..<cols {
+                cells.append(LayoutCell(x: Double(c) * w, y: Double(r) * h, w: w, h: h))
+            }
+        }
+        return LayoutSpec(id: "grid-\(rows)x\(cols)", name: "\(rows)×\(cols)", cells: cells)
+    }
+
+    /// cols개 열 중 한쪽 끝 열이 세로 100%를 차지하고, 나머지 열은 rows행으로 나뉜다.
+    /// 셀 수 = 1 + (cols - 1) * rows  (예: cols 4, rows 2 → 7칸)
+    static func fullColumn(onLeft: Bool, cols: Int, rows: Int) -> LayoutSpec {
+        let w = 1.0 / Double(cols)
+        let h = 1.0 / Double(rows)
+        var cells: [LayoutCell] = []
+
+        // 세로 100% 열
+        let fullX = onLeft ? 0.0 : 1.0 - w
+        cells.append(LayoutCell(x: fullX, y: 0, w: w, h: 1))
+
+        // 나머지 열을 rows행으로 분할
+        let range = onLeft ? 1..<cols : 0..<(cols - 1)
+        for c in range {
+            for r in 0..<rows {
+                cells.append(LayoutCell(x: Double(c) * w, y: Double(r) * h, w: w, h: h))
+            }
+        }
+
+        let side = onLeft ? "왼쪽" : "오른쪽"
+        return LayoutSpec(
+            id: "full-\(onLeft ? "l" : "r")-\(cols)x\(rows)",
+            name: "\(side) 전체 높이 + \(rows)×\(cols - 1)",
+            cells: cells
+        )
+    }
+}
+
+/// 팝오버의 탭. 가로 모니터용/세로 모니터용 레이아웃 목록을 따로 가진다.
+enum LayoutOrientation: String, CaseIterable, Identifiable {
+    case landscape, portrait
+    var id: String { rawValue }
+
+    var title: String { self == .landscape ? "가로" : "세로" }
+    var symbol: String { self == .landscape ? "rectangle" : "rectangle.portrait" }
+
+    /// 탭에 표시할 레이아웃. tilesPerRow개씩 끊어 두 줄로 놓인다.
+    var layouts: [LayoutSpec] {
+        switch self {
+        case .landscape:
+            // 윗줄: 1행 분할 + 왼쪽 전체 높이 변형(5칸, 7칸)
+            // 아랫줄: 2행 분할 + 오른쪽 전체 높이 변형(5칸, 7칸)
+            return [
+                .grid(rows: 1, cols: 2), .grid(rows: 1, cols: 3), .grid(rows: 1, cols: 4),
+                .fullColumn(onLeft: true, cols: 3, rows: 2),
+                .fullColumn(onLeft: true, cols: 4, rows: 2),
+                .grid(rows: 2, cols: 2), .grid(rows: 2, cols: 3), .grid(rows: 2, cols: 4),
+                .fullColumn(onLeft: false, cols: 3, rows: 2),
+                .fullColumn(onLeft: false, cols: 4, rows: 2),
+            ]
+        case .portrait:
+            return [
+                .grid(rows: 2, cols: 1), .grid(rows: 3, cols: 1), .grid(rows: 4, cols: 1),
+                .grid(rows: 2, cols: 2), .grid(rows: 3, cols: 2), .grid(rows: 4, cols: 2),
+            ]
+        }
+    }
+
+    /// 한 줄에 놓을 타일 수
+    var tilesPerRow: Int { self == .landscape ? 5 : 3 }
+
+    /// 타일의 셀 영역 크기(카드 패딩 제외). 가로는 16:9, 세로는 9:16.
+    var tileSize: CGSize {
+        switch self {
+        case .landscape: return CGSize(width: 76, height: 43)
+        case .portrait:  return CGSize(width: 112, height: 199)
+        }
+    }
 }
 
 final class LayoutModel: ObservableObject {
-    /// 팝오버에 표시할 그리드. 윗줄은 1행(1×2, 1×3, 1×4), 아랫줄은 2행(2×2, 2×3, 2×4).
-    static let grids: [GridSpec] = [
-        GridSpec(rows: 1, cols: 2), GridSpec(rows: 1, cols: 3), GridSpec(rows: 1, cols: 4),
-        GridSpec(rows: 2, cols: 2), GridSpec(rows: 2, cols: 3), GridSpec(rows: 2, cols: 4),
-    ]
-    /// 팝오버 한 줄에 놓을 타일 수
-    static let tilesPerRow = 3
-    /// 팝오버 맨 오른쪽에 세로로 길게 놓는 그리드(세로 모니터용). 두 줄 높이를 차지한다.
-    static let portraitGrids: [GridSpec] = [
-        GridSpec(rows: 4, cols: 2),
-    ]
-
+    @Published var orientation: LayoutOrientation {
+        didSet {
+            guard oldValue != orientation else { return }
+            UserDefaults.standard.set(orientation.rawValue, forKey: "orientation")
+            // 팝오버 크기를 즉시(같은 프레임에) 맞춘다. 늦추면 한 프레임 동안 크기가 어긋나 깜빡인다.
+            onLayoutChanged?()
+        }
+    }
     @Published var targetApp: NSRunningApplication?
     @Published var accessibilityGranted = AXIsProcessTrusted()
     @Published var gap: Double {
@@ -27,12 +114,15 @@ final class LayoutModel: ObservableObject {
     }
 
     var onApplied: (() -> Void)?
+    /// 탭 전환 등으로 팝오버 내용 크기가 바뀔 때 호출(AppDelegate가 팝오버 크기를 갱신)
+    var onLayoutChanged: (() -> Void)?
 
     private var observer: NSObjectProtocol?
     private let ownPID = ProcessInfo.processInfo.processIdentifier
 
     init() {
         gap = UserDefaults.standard.object(forKey: "gap") as? Double ?? 8
+        orientation = LayoutOrientation(rawValue: UserDefaults.standard.string(forKey: "orientation") ?? "") ?? .landscape
         targetApp = NSWorkspace.shared.frontmostApplication
         observer = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -52,11 +142,15 @@ final class LayoutModel: ObservableObject {
         if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != ownPID {
             targetApp = front
         }
+        // 대상 창이 놓인 모니터 방향에 맞춰 탭을 자동 선택(세로 모니터면 세로 탭)
+        if let app = targetApp, let portrait = WindowMover.isFocusedWindowOnPortraitScreen(appPID: app.processIdentifier) {
+            orientation = portrait ? .portrait : .landscape
+        }
     }
 
-    func apply(grid: GridSpec, row: Int, col: Int) {
+    func apply(cell: LayoutCell) {
         guard let app = targetApp else { NSSound.beep(); return }
-        WindowMover.move(appPID: app.processIdentifier, grid: grid, row: row, col: col, gap: CGFloat(gap))
+        WindowMover.move(appPID: app.processIdentifier, cell: cell, gap: CGFloat(gap))
         onApplied?()
     }
 }

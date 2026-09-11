@@ -26,18 +26,20 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
 
 ## 구조
 - `Sources/WindowLayout/main.swift` — 진입점, `.accessory` 정책(독 아이콘 없음, `LSUIElement`)
-- `AppDelegate.swift` — 상태바 아이템, NSPopover. 팝오버 크기는 표시 직전에
-  `hosting.sizeThatFits`로 고정(`sizingOptions = []`). 이걸 풀면 팝오버가 위로 밀려 잘린다.
-- `LayoutModel.swift` — 그리드 정의(윗줄 1×2·1×3·1×4, 아랫줄 2×2·2×3·2×4, `tilesPerRow`로 줄당 개수 조절; 맨 오른쪽 세로 타일은 `portraitGrids`(4×2)), 대상 앱 추적
+- `AppDelegate.swift` — 상태바 아이템, NSPopover(`sizingOptions = []`). 팝오버 크기는 직접 지정한다.
+  **탭 전환 직후 `hosting.sizeThatFits`는 이전 탭 크기를 돌려준다.** 그대로 쓰면 팝오버가 잘리거나 깜빡이므로,
+  타일 영역 높이는 `PopoverView.tilesHeight(for:)`로 계산해 같은 프레임에 적용하고 나머지 높이(chrome)는
+  렌더가 끝난 뒤 실측으로 보정한다.
+- `LayoutModel.swift` — `LayoutCell`(0~1 비율 셀), `LayoutSpec`(셀 목록; `.grid(rows:cols:)`와 `.fullColumn(onLeft:cols:rows:)` 팩토리), `LayoutOrientation`(탭별 레이아웃·타일 비율·줄당 개수), 선택 탭(UserDefaults `orientation`, 팝오버 열 때 대상 창의 모니터 방향으로 자동 선택), 대상 앱 추적
   (`NSWorkspace.didActivateApplicationNotification`, 자기 자신 제외), 간격 설정(UserDefaults `gap`)
-- `WindowMover.swift` — 포커스 창 조회, 창이 놓인 화면의 `visibleFrame`을 rows×cols로 분할,
+- `WindowMover.swift` — 포커스 창 조회, 창이 놓인 화면의 `visibleFrame`에 비율 셀을 대입(`frame(in:cell:gap:)`),
   Cocoa(좌하단 원점)↔AX(좌상단 원점, 기준은 `NSScreen.screens[0]`) 좌표 변환, 위치→크기→위치 순 적용
-- `PopoverView.swift` — 팝오버 UI(그리드, 간격 조절 `GapRow`, 로그인 시 실행 `LoginItemRow`, Quit). **LazyVGrid 금지**(표시 후 크기가 바뀌어 팝오버가 잘림)
+- `PopoverView.swift` — 팝오버 UI. 헤더(앱 + 캡슐 탭 `OrientationTabs`), 카드형 타일 `GridTile`, 설정 그룹(`GapStepper`, `LoginItemToggle`), 푸터(버전 + 종료). 구분선(Divider) 사용하지 않음. **LazyVGrid 금지**(표시 후 크기가 바뀌어 팝오버가 잘림)
 - `Info.plist` — 번들 ID `com.brian.windowlayout`, `LSUIElement=true`, `CFBundleIconFile=AppIcon`
 - `Resources/AppIcon.icns` — `scripts/make_icon.swift`가 그린 생성물
 
 ## 검증 방법
 1. `./build.sh install` 후 메뉴바에 2×2 아이콘이 뜨는지.
-2. `swift scripts/verify_popover.swift /tmp/pop.png` → 팝오버가 아이콘 아래에 헤더/그리드 6개/창 간격/로그인 토글/Quit까지
+2. `swift scripts/verify_popover.swift /tmp/pop.png` → 팝오버가 아이콘 아래에 헤더/가로·세로 탭/그리드 6개/창 간격/로그인 토글/Quit까지
    전부 보이고 권한 경고가 없는지 이미지로 확인.
 3. 아무 앱 창을 띄운 뒤 셀 클릭 → 창이 해당 칸(메뉴바·독 제외 영역, 기본 간격 8px)에 맞는지.

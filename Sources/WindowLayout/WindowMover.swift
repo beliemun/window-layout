@@ -15,24 +15,34 @@ enum AccessibilityAccess {
 }
 
 enum WindowMover {
-    static func move(appPID: pid_t, grid: GridSpec, row: Int, col: Int, gap: CGFloat) {
+    static func move(appPID: pid_t, cell: LayoutCell, gap: CGFloat) {
         let appElement = AXUIElementCreateApplication(appPID)
         guard let window = focusedWindow(of: appElement) else { NSSound.beep(); return }
         let screen = screen(for: window)
-        let target = cellFrame(in: screen.visibleFrame, grid: grid, row: row, col: col, gap: gap)
+        let target = frame(in: screen.visibleFrame, cell: cell, gap: gap)
         setFrame(of: window, cocoaRect: target)
+    }
+
+    /// 앱의 포커스 창이 세로 모니터에 있으면 true. 창을 못 찾으면 nil.
+    static func isFocusedWindowOnPortraitScreen(appPID: pid_t) -> Bool? {
+        guard let window = focusedWindow(of: AXUIElementCreateApplication(appPID)) else { return nil }
+        let frame = screen(for: window).frame
+        return frame.height > frame.width
     }
 
     // MARK: - Geometry
 
-    /// 화면(visibleFrame, Cocoa 좌표계)을 rows×cols로 나눴을 때 (row, col) 칸의 프레임. row 0 = 맨 위.
-    static func cellFrame(in area: CGRect, grid: GridSpec, row: Int, col: Int, gap: CGFloat) -> CGRect {
-        let cols = CGFloat(grid.cols), rows = CGFloat(grid.rows)
-        let cellW = (area.width - gap * (cols + 1)) / cols
-        let cellH = (area.height - gap * (rows + 1)) / rows
-        let x = area.minX + gap + CGFloat(col) * (cellW + gap)
-        let y = area.maxY - gap - CGFloat(row + 1) * cellH - CGFloat(row) * gap
-        return CGRect(x: x, y: y, width: cellW, height: cellH).integral
+    /// 비율 셀(원점 좌상단)을 화면 영역(visibleFrame, Cocoa 좌표계)의 실제 프레임으로 변환한다.
+    /// 바깥 여백과 창 사이 여백이 모두 gap이 되도록 영역과 셀을 각각 gap/2씩 줄인다.
+    static func frame(in area: CGRect, cell: LayoutCell, gap: CGFloat) -> CGRect {
+        let a = area.insetBy(dx: gap / 2, dy: gap / 2)
+        let rect = CGRect(
+            x: a.minX + a.width * cell.x,
+            y: a.maxY - a.height * (cell.y + cell.h),
+            width: a.width * cell.w,
+            height: a.height * cell.h
+        ).insetBy(dx: gap / 2, dy: gap / 2)
+        return rect.integral
     }
 
     private static var primaryHeight: CGFloat {

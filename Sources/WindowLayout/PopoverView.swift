@@ -5,78 +5,58 @@ struct PopoverView: View {
     @ObservedObject var model: LayoutModel
 
     static let width: CGFloat = 500
-    static let tileHeight: CGFloat = 88
-    static let tileSpacing: CGFloat = 12
-    static let portraitTileWidth: CGFloat = 84
+    static let padding: CGFloat = 14
+    static let tileSpacing: CGFloat = 8
 
-    /// tilesPerRow개씩 묶어 줄을 만든다.
-    private var gridRows: [[GridSpec]] {
-        let n = LayoutModel.tilesPerRow
-        return stride(from: 0, to: LayoutModel.grids.count, by: n).map {
-            Array(LayoutModel.grids[$0..<min($0 + n, LayoutModel.grids.count)])
+    /// 탭의 타일 영역 높이. 탭 전환 시 팝오버 크기를 한 프레임 안에 맞추기 위해 직접 계산한다.
+    static func tilesHeight(for orientation: LayoutOrientation) -> CGFloat {
+        let rows = Int(ceil(Double(orientation.layouts.count) / Double(orientation.tilesPerRow)))
+        let cardHeight = orientation.tileSize.height + LayoutTile.cardPadding * 2
+        return CGFloat(rows) * cardHeight + CGFloat(max(rows - 1, 0)) * tileSpacing
+    }
+
+    /// 현재 탭의 레이아웃을 tilesPerRow개씩 묶어 줄을 만든다.
+    private var tileRows: [[LayoutSpec]] {
+        let layouts = model.orientation.layouts
+        let n = model.orientation.tilesPerRow
+        return stride(from: 0, to: layouts.count, by: n).map {
+            Array(layouts[$0..<min($0 + n, layouts.count)])
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             header
 
             if !model.accessibilityGranted {
                 accessibilityWarning
             }
 
-            // LazyVGrid는 팝오버 표시 후에 크기를 늦게 보고해 팝오버가 위로 밀리므로 사용하지 않는다.
-            HStack(alignment: .top, spacing: Self.tileSpacing) {
-                VStack(spacing: Self.tileSpacing) {
-                    ForEach(gridRows, id: \.self) { line in
-                        HStack(spacing: Self.tileSpacing) {
-                            ForEach(line) { grid in
-                                GridTile(grid: grid, height: Self.tileHeight) { row, col in
-                                    model.apply(grid: grid, row: row, col: col)
-                                }
-                            }
-                        }
-                    }
-                }
-                // 세로 모니터용 그리드: 두 줄 높이의 세로 타일
-                let portraitHeight = Self.tileHeight * CGFloat(gridRows.count)
-                    + Self.tileSpacing * CGFloat(max(gridRows.count - 1, 0))
-                ForEach(LayoutModel.portraitGrids) { grid in
-                    GridTile(grid: grid, height: portraitHeight, width: Self.portraitTileWidth) { row, col in
-                        model.apply(grid: grid, row: row, col: col)
-                    }
-                }
-            }
+            tiles
 
-            VStack(spacing: 0) {
-                Divider()
-                GapRow(gap: $model.gap)
-                Divider()
-                LoginItemRow()
-                Divider()
-                MenuRow(title: "Quit", shortcut: "⌘ Q") { NSApp.terminate(nil) }
-                    .keyboardShortcut("q", modifiers: .command)
-            }
+            settingsGroup
+
+            footer
         }
-        .padding(16)
+        .padding(Self.padding)
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
     }
 
+    // MARK: 헤더: 대상 앱 + 가로/세로 탭
+
     private var header: some View {
         HStack(spacing: 8) {
             if let icon = model.targetApp?.icon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 22, height: 22)
+                Image(nsImage: icon).resizable().frame(width: 24, height: 24)
             } else {
-                Image(systemName: "macwindow")
-                    .frame(width: 22, height: 22)
+                Image(systemName: "macwindow").font(.system(size: 16)).frame(width: 24, height: 24)
             }
             Text(model.targetApp?.localizedName ?? "창 없음")
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
-            Spacer()
+            Spacer(minLength: 8)
+            OrientationTabs(selection: $model.orientation)
         }
     }
 
@@ -85,147 +65,220 @@ struct PopoverView: View {
             AccessibilityAccess.requestIfNeeded()
             AccessibilityAccess.openSystemSettings()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
                 Text("손쉬운 사용 권한이 필요합니다. 클릭해서 설정 열기")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.yellow.opacity(0.12)))
         }
         .buttonStyle(.plain)
     }
-}
 
-/// rows×cols 그리드 하나. 각 셀을 클릭하면 onSelect(row, col)이 호출된다.
-struct GridTile: View {
-    let grid: GridSpec
-    var height: CGFloat = 88
-    var width: CGFloat? = nil
-    let onSelect: (Int, Int) -> Void
+    // MARK: 타일
 
-    @State private var hovered: (row: Int, col: Int)? = nil
-
-    private let spacing: CGFloat = 5
-
-    var body: some View {
-        VStack(spacing: spacing) {
-            ForEach(0..<grid.rows, id: \.self) { row in
-                HStack(spacing: spacing) {
-                    ForEach(0..<grid.cols, id: \.self) { col in
-                        cell(row: row, col: col)
+    private var tiles: some View {
+        let tile = model.orientation.tileSize
+        return VStack(spacing: Self.tileSpacing) {
+            ForEach(tileRows, id: \.self) { line in
+                HStack(spacing: Self.tileSpacing) {
+                    ForEach(line) { spec in
+                        LayoutTile(spec: spec, cellArea: tile) { cell in
+                            model.apply(cell: cell)
+                        }
                     }
                 }
             }
         }
-        .frame(width: width, height: height)
+        .frame(maxWidth: .infinity)
+        // 탭을 바꿀 때 타일이 애니메이션되며 깜빡이지 않도록 즉시 교체한다.
+        .animation(nil, value: model.orientation)
     }
 
-    private func cell(row: Int, col: Int) -> some View {
-        let isHovered = hovered?.row == row && hovered?.col == col
-        return RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(isHovered ? Color.accentColor.opacity(0.8) : Color.primary.opacity(0.12))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .onHover { inside in
-                hovered = inside ? (row, col) : nil
+    // MARK: 설정 그룹
+
+    private var settingsGroup: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label("창 간격", systemImage: "arrow.left.and.right.square")
+                    .font(.system(size: 13))
+                Spacer()
+                GapStepper(gap: $model.gap)
             }
-            .onTapGesture { onSelect(row, col) }
-            .help("\(grid.rows)×\(grid.cols) — \(row + 1)행 \(col + 1)열")
+            .padding(.horizontal, 12).padding(.vertical, 9)
+
+            HStack {
+                Label("로그인 시 자동 실행", systemImage: "power")
+                    .font(.system(size: 13))
+                Spacer()
+                LoginItemToggle()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+        }
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.06)))
+    }
+
+    // MARK: 푸터
+
+    private var footer: some View {
+        HStack {
+            Text("WindowLayout \(Self.version)")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Button { NSApp.terminate(nil) } label: {
+                HStack(spacing: 6) {
+                    Text("종료").font(.system(size: 12, weight: .medium))
+                    Text("⌘Q").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.primary.opacity(0.08)))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("q", modifiers: .command)
+        }
+    }
+
+    private static var version: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        return v.isEmpty ? "" : "v\(v)"
     }
 }
 
-struct MenuRow: View {
-    let title: String
-    let shortcut: String
-    let action: () -> Void
+// MARK: - 가로/세로 캡슐 탭
 
-    @State private var hovered = false
+struct OrientationTabs: View {
+    @Binding var selection: LayoutOrientation
 
     var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(title).font(.system(size: 15))
-                Spacer()
-                Text(shortcut).font(.system(size: 14)).foregroundStyle(.secondary)
+        HStack(spacing: 2) {
+            ForEach(LayoutOrientation.allCases) { o in
+                let selected = o == selection
+                Button { selection = o } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: o.symbol)
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(o.title).font(.system(size: 12, weight: .medium))
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .foregroundStyle(selected ? Color.primary : Color.secondary)
+                    .background(
+                        Capsule().fill(selected ? Color.primary.opacity(0.14) : Color.clear)
+                    )
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 6)
-            .contentShape(Rectangle())
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(hovered ? Color.primary.opacity(0.08) : Color.clear)
-            )
         }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
+        .padding(2)
+        .background(Capsule().fill(Color.primary.opacity(0.06)))
+        .animation(.easeOut(duration: 0.12), value: selection)
     }
 }
 
-/// 창 간격(px) 조절 줄: 슬라이더 + −/+ 버튼
-struct GapRow: View {
+// MARK: - 레이아웃 타일 (카드 안에 비율대로 배치된 셀)
+
+struct LayoutTile: View {
+    let spec: LayoutSpec
+    /// 셀 영역 크기(카드 패딩 제외). 가로 16:9, 세로 9:16.
+    let cellArea: CGSize
+    let onSelect: (LayoutCell) -> Void
+
+    @State private var hoveredIndex: Int? = nil
+    @State private var cardHovered = false
+
+    static let cardPadding: CGFloat = 6
+    private let cellGap: CGFloat = 3
+    private var cardPadding: CGFloat { Self.cardPadding }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(spec.cells.enumerated()), id: \.offset) { item in
+                cellView(index: item.offset, cell: item.element)
+            }
+        }
+        .frame(width: cellArea.width, height: cellArea.height, alignment: .topLeading)
+        .padding(cardPadding)
+        .background(cardBackground)
+        .onHover { cardHovered = $0 }
+        .help(spec.name)
+    }
+
+    private func cellView(index: Int, cell: LayoutCell) -> some View {
+        let width: CGFloat = max(cellArea.width * CGFloat(cell.w) - cellGap, 2)
+        let height: CGFloat = max(cellArea.height * CGFloat(cell.h) - cellGap, 2)
+        let dx: CGFloat = cellArea.width * CGFloat(cell.x) + cellGap / 2
+        let dy: CGFloat = cellArea.height * CGFloat(cell.y) + cellGap / 2
+        let fill: Color = hoveredIndex == index ? Color.accentColor : Color.primary.opacity(0.16)
+
+        return RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(fill)
+            .frame(width: width, height: height)
+            .offset(x: dx, y: dy)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                if inside { hoveredIndex = index }
+                else if hoveredIndex == index { hoveredIndex = nil }
+            }
+            .onTapGesture { onSelect(cell) }
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color.primary.opacity(cardHovered ? 0.10 : 0.06))
+    }
+}
+
+// MARK: - 창 간격 스테퍼 [ − | 8 px | + ]
+
+struct GapStepper: View {
     @Binding var gap: Double
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text("창 간격").font(.system(size: 15))
-            Spacer()
+        HStack(spacing: 0) {
             stepButton("minus") { gap = max(0, gap - 1) }
-            // step:을 주면 macOS 슬라이더가 눈금(점)을 그리므로, 눈금 없이 값만 정수로 반올림한다.
-            Slider(value: Binding(get: { gap }, set: { gap = $0.rounded() }), in: 0...32)
-                .frame(width: 110)
-            stepButton("plus") { gap = min(32, gap + 1) }
             Text("\(Int(gap)) px")
-                .font(.system(size: 13))
+                .font(.system(size: 12, weight: .medium))
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 40, alignment: .trailing)
+                .frame(width: 46)
+            stepButton("plus") { gap = min(32, gap + 1) }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
+        .background(Capsule().fill(Color.primary.opacity(0.08)))
     }
 
     private func stepButton(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 10, weight: .bold))
-                .frame(width: 18, height: 18)
-                .background(Circle().fill(Color.primary.opacity(0.12)))
+                .frame(width: 26, height: 24)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 }
 
-/// 로그인 시 자동 실행 토글
-struct LoginItemRow: View {
+// MARK: - 로그인 시 자동 실행 토글
+
+struct LoginItemToggle: View {
     @State private var enabled = SMAppService.mainApp.status == .enabled
-    @State private var error: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text("로그인 시 자동 실행").font(.system(size: 15))
-                Spacer()
-                Toggle("", isOn: $enabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-            }
+        Toggle("", isOn: $enabled)
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
             .onChange(of: enabled) { on in
                 do {
                     if on { try SMAppService.mainApp.register() }
                     else { try SMAppService.mainApp.unregister() }
-                    error = nil
                 } catch {
-                    self.error = error.localizedDescription
+                    NSLog("login item change failed: \(error.localizedDescription)")
                     enabled = SMAppService.mainApp.status == .enabled
                 }
             }
-            if let error {
-                Text(error).font(.system(size: 11)).foregroundStyle(.red)
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
-        .onAppear { enabled = SMAppService.mainApp.status == .enabled }
+            .onAppear { enabled = SMAppService.mainApp.status == .enabled }
     }
 }
