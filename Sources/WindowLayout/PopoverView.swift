@@ -86,9 +86,12 @@ struct PopoverView: View {
             ForEach(tileRows, id: \.self) { line in
                 HStack(spacing: Self.tileSpacing) {
                     ForEach(line) { spec in
-                        LayoutTile(spec: spec, cellArea: tile) { cell in
-                            model.apply(cell: cell)
-                        }
+                        LayoutTile(
+                            spec: spec,
+                            cellArea: tile,
+                            onSelect: { cell in model.apply(cell: cell) },
+                            onArrange: { model.arrange(spec: spec) }
+                        )
                     }
                 }
             }
@@ -186,6 +189,8 @@ struct LayoutTile: View {
     /// 셀 영역 크기(카드 패딩 제외). 가로 16:9, 세로 9:16.
     let cellArea: CGSize
     let onSelect: (LayoutCell) -> Void
+    /// 카드 모서리의 번개 버튼: 화면의 창들을 이 레이아웃으로 한 번에 배치
+    let onArrange: () -> Void
 
     @State private var hoveredIndex: Int? = nil
     @State private var cardHovered = false
@@ -203,6 +208,10 @@ struct LayoutTile: View {
         .frame(width: cellArea.width, height: cellArea.height, alignment: .topLeading)
         .padding(cardPadding)
         .background(cardBackground)
+        // .offset을 쓰지 않는다(히트 영역이 어긋남). overlay 정렬로 배치한다.
+        .overlay(alignment: .topTrailing) {
+            if cardHovered { arrangeButton }
+        }
         .onHover { cardHovered = $0 }
         .help(spec.name)
     }
@@ -226,6 +235,20 @@ struct LayoutTile: View {
             }
             .onTapGesture { onSelect(cell) }
             .offset(x: dx, y: dy)
+    }
+
+    private var arrangeButton: some View {
+        Button(action: onArrange) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 15, height: 15)
+                .background(Circle().fill(Color.accentColor))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(1)
+        .help("현재 화면의 창들을 이 레이아웃으로 자동 배치")
     }
 
     private var cardBackground: some View {

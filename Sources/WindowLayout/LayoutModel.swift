@@ -148,6 +148,16 @@ final class LayoutModel: ObservableObject {
         }
     }
 
+    /// 현재 화면의 창들을 이 레이아웃대로 한 번에 배치한다.
+    func arrange(spec: LayoutSpec) {
+        let placed = WindowMover.arrange(cells: spec.cells, gap: CGFloat(gap), on: WindowMover.currentScreen())
+        if placed > 0 {
+            onApplied?()
+        } else {
+            NSSound.beep()   // 배치할 창이 없으면 팝오버를 닫지 않는다
+        }
+    }
+
     func apply(cell: LayoutCell) {
         guard let app = targetApp else { NSSound.beep(); return }
         WindowMover.move(appPID: app.processIdentifier, cell: cell, gap: CGFloat(gap))

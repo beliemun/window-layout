@@ -49,6 +49,13 @@ macOS 13+, Xcode 또는 Command Line Tools(`swift`, `codesign`, `iconutil`).
 ### 아이콘
 `scripts/build_icon.sh`가 `scripts/make_icon.swift`로 1024px 이미지를 그려 `Resources/AppIcon.icns`를 만든다.
 
+## 자동 배치
+타일에 마우스를 올리면 오른쪽 위에 번개 버튼이 나타난다. 누르면 **현재 화면에 보이는 창들을 앞에 있는 것부터
+그 레이아웃의 칸에 한 번에 채운다.** 칸보다 창이 많으면 남는 창은 건드리지 않고, 창이 적으면 앞쪽 칸만 채운다.
+셀을 하나만 누르면 기존처럼 최전면 창 하나만 그 자리로 옮긴다.
+
+기준 화면은 팝오버를 띄운 화면(마우스가 있는 화면)이다.
+
 ## 팝오버 하단 설정
 - 창 간격(px): 슬라이더 또는 −/+ 버튼
 - 로그인 시 자동 실행 토글 (첫 실행 시 기본 켜짐, UserDefaults `launchAtLoginConfigured`)

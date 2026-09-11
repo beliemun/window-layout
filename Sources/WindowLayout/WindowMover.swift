@@ -74,7 +74,8 @@ enum WindowMover {
         return nil
     }
 
-    private static func currentFrame(of window: AXUIElement) -> CGRect? {
+    /// 창의 프레임을 AX 좌표계(좌상단 원점) 그대로 돌려준다. CGWindowList의 bounds와 같은 좌표계다.
+    static func axFrame(of window: AXUIElement) -> CGRect? {
         var posValue: CFTypeRef?
         var sizeValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &posValue) == .success,
@@ -86,7 +87,12 @@ enum WindowMover {
         guard AXValueGetValue(p as! AXValue, .cgPoint, &origin),
               AXValueGetValue(s as! AXValue, .cgSize, &size)
         else { return nil }
-        return cocoaRect(fromAX: origin, size: size)
+        return CGRect(origin: origin, size: size)
+    }
+
+    private static func currentFrame(of window: AXUIElement) -> CGRect? {
+        guard let ax = axFrame(of: window) else { return nil }
+        return cocoaRect(fromAX: ax.origin, size: ax.size)
     }
 
     /// 창의 중심이 놓인 화면. 못 찾으면 마우스가 있는 화면, 그것도 없으면 메인 화면.
@@ -98,6 +104,80 @@ enum WindowMover {
         let mouse = NSEvent.mouseLocation
         if let s = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) { return s }
         return NSScreen.main ?? NSScreen.screens[0]
+    }
+
+    // MARK: - 자동 배치
+
+    /// 마우스가 있는 화면(= 팝오버를 띄운 화면). 없으면 메인 화면.
+    static func currentScreen() -> NSScreen {
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main ?? NSScreen.screens[0]
+    }
+
+    /// 해당 화면에 보이는 창을 앞에 있는 것부터(z-order) 돌려준다.
+    /// 창 목록과 순서는 CGWindowList에서 얻고(제목은 읽지 않으므로 화면 기록 권한이 필요 없다),
+    /// 실제 이동은 프레임이 일치하는 AX 창으로 한다.
+    static func arrangeableWindows(on screen: NSScreen) -> [AXUIElement] {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let info = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
+
+        // 화면 영역을 AX 좌표계로
+        let screenArea = CGRect(
+            x: screen.frame.minX,
+            y: primaryHeight - screen.frame.maxY,
+            width: screen.frame.width,
+            height: screen.frame.height
+        )
+
+        var axWindowsByPID: [pid_t: [AXUIElement]] = [:]
+        var result: [AXUIElement] = []
+
+        for entry in info {
+            guard let layer = entry[kCGWindowLayer as String] as? Int, layer == 0,
+                  let pid = entry[kCGWindowOwnerPID as String] as? pid_t, pid != ownPID,
+                  let bounds = entry[kCGWindowBounds as String] as? [String: CGFloat],
+                  let x = bounds["X"], let y = bounds["Y"],
+                  let width = bounds["Width"], let height = bounds["Height"],
+                  width >= 120, height >= 120   // 팔레트·툴팁 같은 작은 창 제외
+            else { continue }
+
+            let frame = CGRect(x: x, y: y, width: width, height: height)
+            guard screenArea.contains(CGPoint(x: frame.midX, y: frame.midY)) else { continue }
+
+            let windows: [AXUIElement]
+            if let cached = axWindowsByPID[pid] {
+                windows = cached
+            } else {
+                var value: CFTypeRef?
+                AXUIElementCopyAttributeValue(AXUIElementCreateApplication(pid), kAXWindowsAttribute as CFString, &value)
+                windows = (value as? [AXUIElement]) ?? []
+                axWindowsByPID[pid] = windows
+            }
+
+            guard let match = windows.first(where: { window in
+                guard let f = axFrame(of: window) else { return false }
+                return abs(f.minX - frame.minX) < 2 && abs(f.minY - frame.minY) < 2
+                    && abs(f.width - frame.width) < 2 && abs(f.height - frame.height) < 2
+            }) else { continue }
+            guard !result.contains(where: { CFEqual($0, match) }) else { continue }
+
+            result.append(match)
+        }
+        return result
+    }
+
+    /// 화면에 보이는 창들을 레이아웃의 칸에 앞에서부터 채운다. 배치한 창 수를 돌려준다.
+    /// 칸보다 창이 많으면 남는 창은 건드리지 않는다.
+    @discardableResult
+    static func arrange(cells: [LayoutCell], gap: CGFloat, on screen: NSScreen) -> Int {
+        let windows = arrangeableWindows(on: screen)
+        let count = min(windows.count, cells.count)
+        guard count > 0 else { return 0 }
+        for index in 0..<count {
+            setFrame(of: windows[index], cocoaRect: frame(in: screen.visibleFrame, cell: cells[index], gap: gap))
+        }
+        return count
     }
 
     private static func setFrame(of window: AXUIElement, cocoaRect rect: CGRect) {
