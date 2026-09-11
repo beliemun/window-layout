@@ -192,22 +192,36 @@ enum WindowMover {
     }
 
     private static func setFrame(of window: AXUIElement, cocoaRect rect: CGRect) {
-        var origin = axOrigin(fromCocoa: rect)
-        var size = CGSize(width: rect.width, height: rect.height)
-        guard let posValue = AXValueCreate(.cgPoint, &origin),
-              let sizeValue = AXValueCreate(.cgSize, &size)
-        else { return }
-        // 최소/최대 크기 제약이 있는 창을 위해 위치 → 크기 → 위치 순으로 두 번 적용
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
-        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
-        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
+        let origin = axOrigin(fromCocoa: rect)
+        apply(to: window, origin: origin, size: rect.size)
 
-        // 크기 변경을 늦게 반영하는 앱이 있어 한 번 더 확인하고 맞춘다.
-        // (창 자체의 최소 크기 때문에 못 맞추는 경우는 그대로 둔다)
-        if let current = axFrame(of: window),
-           abs(current.width - rect.width) > 1 || abs(current.height - rect.height) > 1 {
-            AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
-            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
+        // 터미널처럼 문자 격자 단위로만 크기가 바뀌는 앱은 요청보다 크게 잡힌다.
+        // 그대로 두면 옆 창과 겹치거나 화면 밖으로 나가므로, 넘친 만큼 줄여 다시 요청해
+        // 칸 안으로 들여놓는다. 겹치는 것보다 약간 비는 편이 낫다.
+        for _ in 0..<2 {
+            guard let actual = axFrame(of: window) else { return }
+            let overWidth = actual.width - rect.width
+            let overHeight = actual.height - rect.height
+            guard overWidth > 1 || overHeight > 1 else { return }
+
+            let reduced = CGSize(
+                width: rect.width - max(overWidth, 0),
+                height: rect.height - max(overHeight, 0)
+            )
+            guard reduced.width >= 200, reduced.height >= 150 else { return }
+            apply(to: window, origin: origin, size: reduced)
         }
+    }
+
+    /// 최소/최대 크기 제약이 있는 창을 위해 위치 → 크기 → 위치 순으로 적용한다.
+    private static func apply(to window: AXUIElement, origin: CGPoint, size: CGSize) {
+        var originValue = origin
+        var sizeValue = size
+        guard let position = AXValueCreate(.cgPoint, &originValue),
+              let dimension = AXValueCreate(.cgSize, &sizeValue)
+        else { return }
+        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, position)
+        AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, dimension)
+        AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, position)
     }
 }

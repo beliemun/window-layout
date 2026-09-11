@@ -35,6 +35,8 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
 - `WindowMover.swift` — 자동 배치(`arrange`/`arrangeableWindows`): 창 목록과 앞뒤 순서는 `CGWindowListCopyWindowInfo`에서
   얻고(창 제목은 읽지 않으므로 화면 기록 권한이 필요 없다), 프레임이 일치하는 AX 창을 찾아 실제로 옮긴다.
   layer 0, 120×120 이상, 중심이 대상 화면 안에 있는 창만 대상이다.
+  `setFrame`은 크기를 적용한 뒤 실제 크기를 다시 읽어, 칸보다 커졌으면 넘친 만큼 줄여 재요청한다
+  (터미널 등은 문자 격자 단위로만 크기가 바뀌어 요청보다 커지고, 그러면 옆 창과 겹치거나 화면 밖으로 나간다).
   창이 칸보다 적으면 `LayoutSpec.fitted(cells:to:)`가 남는 칸을 맞닿은 칸에 합쳐 화면을 다 채운다
   (합치지 않으면 5칸 레이아웃에 창 3개일 때 한 열이 통째로 빈다). 포커스 창 조회, 창이 놓인 화면의 `visibleFrame`에 비율 셀을 대입(`frame(in:cell:gap:)`),
   Cocoa(좌하단 원점)↔AX(좌상단 원점, 기준은 `NSScreen.screens[0]`) 좌표 변환, 위치→크기→위치 순 적용
