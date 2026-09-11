@@ -180,10 +180,13 @@ enum WindowMover {
     @discardableResult
     static func arrange(cells: [LayoutCell], gap: CGFloat, on screen: NSScreen) -> Int {
         let windows = arrangeableWindows(on: screen)
-        let count = min(windows.count, cells.count)
+        guard !windows.isEmpty else { return 0 }
+        // 창이 칸보다 적으면 남는 칸을 합쳐 화면을 남기지 않는다.
+        let targets = LayoutSpec.fitted(cells: cells, to: windows.count)
+        let count = min(windows.count, targets.count)
         guard count > 0 else { return 0 }
         for index in 0..<count {
-            setFrame(of: windows[index], cocoaRect: frame(in: screen.visibleFrame, cell: cells[index], gap: gap))
+            setFrame(of: windows[index], cocoaRect: frame(in: screen.visibleFrame, cell: targets[index], gap: gap))
         }
         return count
     }

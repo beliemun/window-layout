@@ -39,10 +39,10 @@ struct LayoutSpec: Hashable, Identifiable {
         let fullX = onLeft ? 0.0 : 1.0 - w
         cells.append(LayoutCell(x: fullX, y: 0, w: w, h: 1))
 
-        // 나머지 열을 rows행으로 분할
+        // 나머지 열을 rows행으로 분할. 그리드와 같은 행 우선(좌→우, 위→아래) 순서로 담는다.
         let range = onLeft ? 1..<cols : 0..<(cols - 1)
-        for c in range {
-            for r in 0..<rows {
+        for r in 0..<rows {
+            for c in range {
                 cells.append(LayoutCell(x: Double(c) * w, y: Double(r) * h, w: w, h: h))
             }
         }
@@ -53,6 +53,69 @@ struct LayoutSpec: Hashable, Identifiable {
             name: "\(side) 전체 높이 + \(rows)×\(cols - 1)",
             cells: cells
         )
+    }
+}
+
+extension LayoutSpec {
+    /// 창 수가 칸 수보다 적을 때, 남는 칸을 맞닿은 칸에 합쳐 화면이 비지 않게 한다.
+    /// 예) 5칸 레이아웃에 창 3개 → 왼쪽 전체 높이 + 가운데/오른쪽 열도 각각 전체 높이.
+    /// 합칠 곳이 없으면 그 칸은 그냥 비워 둔다.
+    static func fitted(cells: [LayoutCell], to count: Int) -> [LayoutCell] {
+        guard count > 0 else { return [] }
+        guard count < cells.count else { return cells }
+
+        var used = Array(cells.prefix(count))
+        var leftover = Array(cells.dropFirst(count))
+
+        while !leftover.isEmpty {
+            // 남는 칸을 쓰는 칸에 붙여 본다.
+            if mergeLeftover(&leftover, into: &used) { continue }
+            // 붙일 곳이 없으면 남는 칸끼리 먼저 합쳐 더 큰 덩어리로 만든다.
+            if mergeLeftoverTogether(&leftover) { continue }
+            break
+        }
+        return used
+    }
+
+    private static let epsilon = 0.0001
+
+    /// a에 b를 붙일 수 있으면 합친 칸을 돌려준다. 같은 열에서 위아래로, 또는 같은 행에서 좌우로만 붙인다.
+    private static func merging(_ a: LayoutCell, _ b: LayoutCell) -> LayoutCell? {
+        if abs(a.x - b.x) < epsilon, abs(a.w - b.w) < epsilon {
+            if abs(a.y + a.h - b.y) < epsilon { return LayoutCell(x: a.x, y: a.y, w: a.w, h: a.h + b.h) }
+            if abs(b.y + b.h - a.y) < epsilon { return LayoutCell(x: a.x, y: b.y, w: a.w, h: a.h + b.h) }
+        }
+        if abs(a.y - b.y) < epsilon, abs(a.h - b.h) < epsilon {
+            if abs(a.x + a.w - b.x) < epsilon { return LayoutCell(x: a.x, y: a.y, w: a.w + b.w, h: a.h) }
+            if abs(b.x + b.w - a.x) < epsilon { return LayoutCell(x: b.x, y: a.y, w: a.w + b.w, h: a.h) }
+        }
+        return nil
+    }
+
+    private static func mergeLeftover(_ leftover: inout [LayoutCell], into used: inout [LayoutCell]) -> Bool {
+        for (i, cell) in leftover.enumerated() {
+            for j in used.indices {
+                if let merged = merging(used[j], cell) {
+                    used[j] = merged
+                    leftover.remove(at: i)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func mergeLeftoverTogether(_ leftover: inout [LayoutCell]) -> Bool {
+        for i in leftover.indices {
+            for j in leftover.indices where j > i {
+                if let merged = merging(leftover[i], leftover[j]) {
+                    leftover[i] = merged
+                    leftover.remove(at: j)
+                    return true
+                }
+            }
+        }
+        return false
     }
 }
 
