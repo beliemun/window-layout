@@ -1,0 +1,43 @@
+# WindowLayout — 에이전트용 안내
+
+macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, 외부 의존성 없음.
+
+## 요구 사항
+- macOS 13+, Xcode Command Line Tools 이상(`swift`, `codesign`, `iconutil`, `sips`)
+- 키체인에 코드 서명 인증서가 있으면 자동 사용(없으면 ad-hoc, 아래 "권한" 참고)
+
+## 명령
+| 목적 | 명령 |
+|---|---|
+| 빌드+설치+실행 | `./build.sh install` → `/Applications/WindowLayout.app` |
+| 빌드만 | `./build.sh` → `dist/WindowLayout.app` |
+| 아이콘 재생성 | `./scripts/build_icon.sh` (build.sh가 없으면 자동 호출) |
+| 권한 꼬임 초기화 | `./scripts/reset_permission.sh` |
+| 팝오버 시각 검증 | `swift scripts/verify_popover.swift /tmp/pop.png` 후 이미지 확인 |
+
+## 손쉬운 사용 권한 (가장 흔한 문제)
+창 이동은 Accessibility API라 **시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용**에서 허용이 필요하다.
+- 권한이 없으면 팝오버 상단에 노란 경고가 뜬다. 경고가 사라져야 동작한다.
+- TCC는 앱을 "번들 ID + 코드 서명 요구사항"으로 식별한다. **ad-hoc 서명은 빌드마다 신원이 바뀌어**
+  설정의 토글이 켜져 있어도 새 빌드에는 적용되지 않는다. 인증서 서명이면 재빌드해도 유지된다.
+- 토글이 켜져 있는데도 경고가 남으면 항목이 옛 서명에 묶인 것 → `./scripts/reset_permission.sh`로
+  초기화하고 다시 허용한다. 서명 방식이 바뀐 직후에도 한 번 필요하다.
+- `AXIsProcessTrusted()`는 팝오버를 열 때마다 갱신된다(`LayoutModel.refreshTarget`).
+
+## 구조
+- `Sources/WindowLayout/main.swift` — 진입점, `.accessory` 정책(독 아이콘 없음, `LSUIElement`)
+- `AppDelegate.swift` — 상태바 아이템, NSPopover. 팝오버 크기는 표시 직전에
+  `hosting.sizeThatFits`로 고정(`sizingOptions = []`). 이걸 풀면 팝오버가 위로 밀려 잘린다.
+- `LayoutModel.swift` — 그리드 정의(윗줄 1×2·1×3·1×4, 아랫줄 2×2·2×3·2×4, `tilesPerRow`로 줄당 개수 조절), 대상 앱 추적
+  (`NSWorkspace.didActivateApplicationNotification`, 자기 자신 제외), 간격 설정(UserDefaults `gap`)
+- `WindowMover.swift` — 포커스 창 조회, 창이 놓인 화면의 `visibleFrame`을 rows×cols로 분할,
+  Cocoa(좌하단 원점)↔AX(좌상단 원점, 기준은 `NSScreen.screens[0]`) 좌표 변환, 위치→크기→위치 순 적용
+- `PopoverView.swift` — 팝오버 UI(그리드, 간격 조절 `GapRow`, 로그인 시 실행 `LoginItemRow`, Quit). **LazyVGrid 금지**(표시 후 크기가 바뀌어 팝오버가 잘림)
+- `Info.plist` — 번들 ID `com.brian.windowlayout`, `LSUIElement=true`, `CFBundleIconFile=AppIcon`
+- `Resources/AppIcon.icns` — `scripts/make_icon.swift`가 그린 생성물
+
+## 검증 방법
+1. `./build.sh install` 후 메뉴바에 2×2 아이콘이 뜨는지.
+2. `swift scripts/verify_popover.swift /tmp/pop.png` → 팝오버가 아이콘 아래에 헤더/그리드 6개/창 간격/로그인 토글/Quit까지
+   전부 보이고 권한 경고가 없는지 이미지로 확인.
+3. 아무 앱 창을 띄운 뒤 셀 클릭 → 창이 해당 칸(메뉴바·독 제외 영역, 기본 간격 8px)에 맞는지.
