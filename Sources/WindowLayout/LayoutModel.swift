@@ -169,10 +169,12 @@ enum LayoutOrientation: String, CaseIterable, Identifiable {
                 .fullColumn(onLeft: false, cols: 4, rows: 2),
             ]
         case .portrait:
-            // 마지막 둘은 한쪽 끝 행이 가로 100%인 7칸 레이아웃(위/아래)
+            // 뒤쪽 넷은 한쪽 끝 행이 가로 100%인 5칸·7칸 레이아웃(위/아래)
             return [
                 .grid(rows: 2, cols: 1), .grid(rows: 3, cols: 1), .grid(rows: 4, cols: 1),
                 .grid(rows: 2, cols: 2), .grid(rows: 3, cols: 2), .grid(rows: 4, cols: 2),
+                .fullRow(onTop: true, rows: 3, cols: 2),
+                .fullRow(onTop: false, rows: 3, cols: 2),
                 .fullRow(onTop: true, rows: 4, cols: 2),
                 .fullRow(onTop: false, rows: 4, cols: 2),
             ]
@@ -180,13 +182,13 @@ enum LayoutOrientation: String, CaseIterable, Identifiable {
     }
 
     /// 한 줄에 놓을 타일 수. 세로 탭은 6개를 한 줄에 모두 놓는다.
-    var tilesPerRow: Int { self == .landscape ? 5 : 8 }
+    var tilesPerRow: Int { self == .landscape ? 5 : 10 }
 
     /// 타일의 셀 영역 크기(카드 패딩 제외). 가로는 16:9, 세로는 9:16.
     var tileSize: CGSize {
         switch self {
-        case .landscape: return CGSize(width: 104, height: 58)
-        case .portrait:  return CGSize(width: 57, height: 101)
+        case .landscape: return CGSize(width: 116, height: 65)
+        case .portrait:  return CGSize(width: 48, height: 85)
         }
     }
 }
