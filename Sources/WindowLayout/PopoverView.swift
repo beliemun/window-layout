@@ -11,7 +11,7 @@ struct PopoverView: View {
     /// 탭의 타일 영역 높이. 탭 전환 시 팝오버 크기를 한 프레임 안에 맞추기 위해 직접 계산한다.
     static func tilesHeight(for orientation: LayoutOrientation) -> CGFloat {
         let rows = Int(ceil(Double(orientation.layouts.count) / Double(orientation.tilesPerRow)))
-        let cardHeight = orientation.tileSize.height + LayoutTile.cardPadding * 2
+        let cardHeight = LayoutTile.cardHeight(cellHeight: orientation.tileSize.height)
         return CGFloat(rows) * cardHeight + CGFloat(max(rows - 1, 0)) * tileSpacing
     }
 
@@ -194,24 +194,37 @@ struct LayoutTile: View {
 
     @State private var hoveredIndex: Int? = nil
     @State private var cardHovered = false
+    @State private var buttonHovered = false
 
     static let cardPadding: CGFloat = 6
+    /// 자동 배치 버튼 줄. 셀을 가리지 않도록 카드 위쪽에 자리를 따로 둔다.
+    static let headerHeight: CGFloat = 16
+    static let headerSpacing: CGFloat = 4
     private let cellGap: CGFloat = 3
     private var cardPadding: CGFloat { Self.cardPadding }
 
+    /// 카드 전체 높이. 팝오버 크기 계산과 실제 레이아웃이 어긋나지 않도록 한 곳에서 정한다.
+    static func cardHeight(cellHeight: CGFloat) -> CGFloat {
+        cellHeight + headerHeight + headerSpacing + cardPadding * 2
+    }
+
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(Array(spec.cells.enumerated()), id: \.offset) { item in
-                cellView(index: item.offset, cell: item.element)
+        VStack(spacing: Self.headerSpacing) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                arrangeButton
             }
+            .frame(width: cellArea.width, height: Self.headerHeight)
+
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(spec.cells.enumerated()), id: \.offset) { item in
+                    cellView(index: item.offset, cell: item.element)
+                }
+            }
+            .frame(width: cellArea.width, height: cellArea.height, alignment: .topLeading)
         }
-        .frame(width: cellArea.width, height: cellArea.height, alignment: .topLeading)
         .padding(cardPadding)
         .background(cardBackground)
-        // .offset을 쓰지 않는다(히트 영역이 어긋남). overlay 정렬로 배치한다.
-        .overlay(alignment: .topTrailing) {
-            if cardHovered { arrangeButton }
-        }
         .onHover { cardHovered = $0 }
         .help(spec.name)
     }
@@ -240,14 +253,14 @@ struct LayoutTile: View {
     private var arrangeButton: some View {
         Button(action: onArrange) {
             Image(systemName: "bolt.fill")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 15, height: 15)
-                .background(Circle().fill(Color.accentColor))
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(buttonHovered ? Color.white : Color.accentColor)
+                .frame(width: Self.headerHeight, height: Self.headerHeight)
+                .background(Circle().fill(Color.accentColor.opacity(buttonHovered ? 1 : 0.22)))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .padding(1)
+        .onHover { buttonHovered = $0 }
         .help("현재 화면의 창들을 이 레이아웃으로 자동 배치")
     }
 

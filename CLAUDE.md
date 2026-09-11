@@ -42,10 +42,18 @@ macOS 메뉴바 창 정렬 앱(Align 대체). Swift Package + AppKit/SwiftUI, �
 - `Info.plist` — 번들 ID `com.brian.windowlayout`, `LSUIElement=true`, `CFBundleIconFile=AppIcon`
 - `Resources/AppIcon.icns` — `scripts/make_icon.swift`가 그린 생성물
 
+## 설치가 반영되지 않을 때
+`pkill` 직후 바로 `open`하면 이전 프로세스가 아직 살아 있어 **새 바이너리가 실행되지 않고 기존 앱이 활성화만 된다.**
+`build.sh install`은 종료를 확인한 뒤 교체·실행하고, 끝에 실제 실행 여부와 버전을 출력한다. 팝오버 푸터의 버전이
+방금 빌드한 값인지 항상 확인할 것. 번들을 제자리에서 바꾸면 LaunchServices가 예전 Info.plist를 물고 있어
+버전이 옛 값으로 보이므로 `lsregister -f`로 갱신한다.
+
 ## 검증 방법
 1. `./build.sh install` 후 메뉴바에 2×2 아이콘이 뜨는지.
-2. `swift scripts/verify_popover.swift /tmp/pop.png` → 팝오버가 아이콘 아래에 헤더/가로·세로 탭/그리드 6개/창 간격/로그인 토글/Quit까지
+2. 스크린샷 검증 전에 **이전 캡처 파일을 지울 것.** 스크립트가 중간에 실패하면 옛 이미지가 남아
+   바뀌지 않은 화면을 보고 잘못 판단하게 된다(푸터 버전으로 교차 확인).
+3. `swift scripts/verify_popover.swift /tmp/pop.png` → 팝오버가 아이콘 아래에 헤더/가로·세로 탭/그리드 6개/창 간격/로그인 토글/Quit까지
    전부 보이고 권한 경고가 없는지 이미지로 확인.
-3. 아무 앱 창을 띄운 뒤 셀 클릭 → 창이 해당 칸(메뉴바·독 제외 영역, 기본 간격 8px)에 맞는지.
-4. 타일 호버 → 우상단 번개 버튼 클릭 → 화면의 창들이 한 번에 배치되는지.
+4. 아무 앱 창을 띄운 뒤 셀 클릭 → 창이 해당 칸(메뉴바·독 제외 영역, 기본 간격 8px)에 맞는지.
+5. 타일 우상단 번개 버튼 클릭 → 화면의 창들이 한 번에 배치되는지.
    **주의: 사용자 창을 실제로 옮긴다.** 검증용 스크립트는 배치 전 프레임을 저장했다가 끝나고 복원하도록 쓴다.

@@ -50,7 +50,7 @@ macOS 13+, Xcode 또는 Command Line Tools(`swift`, `codesign`, `iconutil`).
 `scripts/build_icon.sh`가 `scripts/make_icon.swift`로 1024px 이미지를 그려 `Resources/AppIcon.icns`를 만든다.
 
 ## 자동 배치
-타일에 마우스를 올리면 오른쪽 위에 번개 버튼이 나타난다. 누르면 **현재 화면에 보이는 창들을 앞에 있는 것부터
+타일 오른쪽 위의 번개 버튼을 누르면 **현재 화면에 보이는 창들을 앞에 있는 것부터
 그 레이아웃의 칸에 한 번에 채운다.** 칸보다 창이 많으면 남는 창은 건드리지 않고, 창이 적으면 앞쪽 칸만 채운다.
 셀을 하나만 누르면 기존처럼 최전면 창 하나만 그 자리로 옮긴다.
 

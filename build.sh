@@ -30,10 +30,33 @@ fi
 echo "✅ built: $APP"
 
 if [[ "${1:-}" == "install" ]]; then
+  # 이전 프로세스가 살아 있으면 open이 새 바이너리를 띄우지 않고 그대로 활성화만 한다.
+  # 반드시 종료를 확인한 뒤에 교체·실행한다.
   pkill -x WindowLayout 2>/dev/null || true
-  sleep 0.5
+  for _ in {1..40}; do
+    pgrep -x WindowLayout >/dev/null || break
+    sleep 0.1
+  done
+  if pgrep -x WindowLayout >/dev/null; then
+    pkill -9 -x WindowLayout 2>/dev/null || true
+    sleep 0.5
+  fi
+
   rm -rf /Applications/WindowLayout.app
   cp -R "$APP" /Applications/WindowLayout.app
+  # 번들을 제자리에서 바꾸면 LaunchServices가 예전 Info.plist를 물고 있어 버전이 옛 값으로 보인다.
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+    -f /Applications/WindowLayout.app >/dev/null 2>&1 || true
   open /Applications/WindowLayout.app
-  echo "🚀 installed & launched: /Applications/WindowLayout.app"
+
+  for _ in {1..40}; do
+    pgrep -x WindowLayout >/dev/null && break
+    sleep 0.1
+  done
+  if pgrep -x WindowLayout >/dev/null; then
+    echo "🚀 installed & launched: /Applications/WindowLayout.app (v$(defaults read /Applications/WindowLayout.app/Contents/Info.plist CFBundleShortVersionString))"
+  else
+    echo "⚠️  설치는 했지만 실행되지 않았습니다: /Applications/WindowLayout.app"
+    exit 1
+  fi
 fi
