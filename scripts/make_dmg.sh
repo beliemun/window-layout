@@ -114,11 +114,16 @@ fi
 
 echo "✅ $DMG  ($(du -h "$DMG" | cut -f1))"
 echo "✅ $ZIP  ($(du -h "$ZIP" | cut -f1))"
-for f in "$DMG" "$ZIP"; do
-  t=open; [[ "$f" == *.zip ]] && t=exec
-  if spctl -a -t $t --context context:primary-signature "$f" >/dev/null 2>&1; then
-    echo "🟢 $(basename "$f"): Gatekeeper 통과"
+# spctl은 zip 파일 자체를 평가하지 못한다. 풀어서 앱을 검사한다.
+check() {  # $1=대상 경로  $2=표시 이름  $3=spctl 타입
+  if spctl -a -t "$3" --context context:primary-signature "$1" >/dev/null 2>&1; then
+    echo "🟢 $2: Gatekeeper 통과 — 받는 쪽에서 아무것도 안 해도 열립니다."
   else
-    echo "🟡 $(basename "$f"): Gatekeeper 거부 — 받는 쪽에서 격리 속성 해제가 필요합니다."
+    echo "🟡 $2: Gatekeeper 거부 — 받는 쪽에서 격리 속성 해제가 필요합니다."
   fi
-done
+}
+check "$DMG" "$(basename "$DMG")" open
+VERIFY=$(mktemp -d)
+ditto -x -k "$ZIP" "$VERIFY"
+check "$VERIFY/WindowLayout.app" "$(basename "$ZIP") 안의 앱" exec
+rm -rf "$VERIFY"
