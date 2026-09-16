@@ -25,6 +25,29 @@ Align을 대체하는 macOS 메뉴바 창 정렬 앱. 상태바 아이콘을 누
 `WindowLayout-<버전>.dmg`를 열고 앱을 `Applications` 폴더로 드래그한다.
 DMG는 `./scripts/make_dmg.sh`로 만든다(`dist/`에 생성).
 
+### 남에게 전달할 때 (Gatekeeper)
+공증(notarization)되지 않은 DMG는 다른 Mac에서 *"악성 코드가 없음을 확인할 수 없습니다"*로
+차단된다. **DMG 자체가 막히므로** 받는 쪽에서 먼저 격리 속성을 벗겨야 한다:
+```sh
+xattr -dr com.apple.quarantine ~/Downloads/WindowLayout-1.7.0.dmg
+open ~/Downloads/WindowLayout-1.7.0.dmg
+# 앱을 Applications로 드래그한 뒤
+xattr -dr com.apple.quarantine /Applications/WindowLayout.app
+```
+(GUI로만: 차단 창에서 **완료** → 시스템 설정 → 개인정보 보호 및 보안 → 맨 아래 **그래도 열기**.
+macOS 15부터는 우클릭 → 열기로는 우회되지 않는다.)
+
+경고 없이 배포하려면 **Developer ID Application** 인증서(유료 Apple Developer Program)가 필요하다.
+`Apple Development` 인증서는 본인 등록 기기 전용이라 배포에 쓸 수 없다. 인증서를 받은 뒤:
+```sh
+# 최초 1회: 공증 인증 정보를 키체인에 저장
+xcrun notarytool store-credentials windowlayout \
+  --apple-id <Apple ID> --team-id <팀 ID> --password <앱 암호>
+
+./scripts/make_dmg.sh --notarize   # 서명(hardened runtime) → 공증 → 스테이플
+```
+스크립트 끝에서 `spctl`로 Gatekeeper 통과 여부를 출력한다.
+
 ## 설치 (릴리스 zip)
 [Releases](https://github.com/beliemun/window-layout/releases)에서 `WindowLayout.app.zip`을 받아 압축을 풀고
 `/Applications`로 옮긴다. 공증(notarization)되지 않았으므로 처음 실행 시 차단되면:
