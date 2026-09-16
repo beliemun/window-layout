@@ -21,6 +21,10 @@ Align을 대체하는 macOS 메뉴바 창 정렬 앱. 상태바 아이콘을 누
 가로 탭의 5칸·7칸은 한쪽 끝 열이 화면 높이 전체를 쓰고 나머지 열이 2행으로 나뉜다.
 세로 탭의 5칸·7칸은 이를 90도 돌린 형태로, 한쪽 끝 행이 화면 너비 전체를 쓰고 나머지 행이 2열로 나뉜다.
 
+## 설치 (DMG)
+`WindowLayout-<버전>.dmg`를 열고 앱을 `Applications` 폴더로 드래그한다.
+DMG는 `./scripts/make_dmg.sh`로 만든다(`dist/`에 생성).
+
 ## 설치 (릴리스 zip)
 [Releases](https://github.com/beliemun/window-layout/releases)에서 `WindowLayout.app.zip`을 받아 압축을 풀고
 `/Applications`로 옮긴다. 공증(notarization)되지 않았으므로 처음 실행 시 차단되면:
