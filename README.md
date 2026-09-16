@@ -37,16 +37,19 @@ xattr -dr com.apple.quarantine /Applications/WindowLayout.app
 (GUI로만: 차단 창에서 **완료** → 시스템 설정 → 개인정보 보호 및 보안 → 맨 아래 **그래도 열기**.
 macOS 15부터는 우클릭 → 열기로는 우회되지 않는다.)
 
-경고 없이 배포하려면 **Developer ID Application** 인증서(유료 Apple Developer Program)가 필요하다.
-`Apple Development` 인증서는 본인 등록 기기 전용이라 배포에 쓸 수 없다. 인증서를 받은 뒤:
+경고를 아예 없애려면 **공증**해야 한다. `Developer ID Application` 인증서가 키체인에 있으면
+`make_dmg.sh`가 그것으로 hardened runtime 서명을 한다(없으면 개발용 인증서로 떨어진다).
+`Apple Development`/`Apple Distribution` 인증서는 배포에 쓸 수 없다.
 ```sh
-# 최초 1회: 공증 인증 정보를 키체인에 저장
+# 최초 1회: 공증 자격 증명을 키체인 프로필로 저장 (앱 암호는 appleid.apple.com에서 발급)
 xcrun notarytool store-credentials windowlayout \
-  --apple-id <Apple ID> --team-id <팀 ID> --password <앱 암호>
+  --apple-id <Apple ID> --team-id 28Y8KR7253 --password <앱 암호>
 
-./scripts/make_dmg.sh --notarize   # 서명(hardened runtime) → 공증 → 스테이플
+./scripts/make_dmg.sh --notarize
 ```
-스크립트 끝에서 `spctl`로 Gatekeeper 통과 여부를 출력한다.
+`--notarize`는 앱을 먼저 공증·스테이플한 뒤 그 앱으로 zip과 DMG를 만들고 DMG도 공증·스테이플한다.
+앱에 티켓이 박혀 있어야 DMG에서 꺼낸 뒤에도 오프라인에서 검증된다.
+스크립트 끝에서 `spctl`로 두 파일의 Gatekeeper 통과 여부를 출력한다.
 
 ## 설치 (릴리스 zip)
 [Releases](https://github.com/beliemun/window-layout/releases)에서 `WindowLayout.app.zip`을 받아 압축을 풀고
