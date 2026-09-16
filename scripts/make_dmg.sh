@@ -4,6 +4,10 @@
 #   ./scripts/make_dmg.sh --no-build   이미 만들어진 dist/WindowLayout.app 사용
 #   ./scripts/make_dmg.sh --notarize   Developer ID로 서명 + 공증 + 스테이플
 #
+# 공증 자격 증명은 미리 키체인 프로필로 저장해 둔다(최초 1회):
+#   xcrun notarytool store-credentials windowlayout \\
+#     --apple-id <Apple ID> --team-id 28Y8KR7253 --password <앱 암호>
+#
 # Gatekeeper 주의:
 #   "Apple Development" 인증서는 본인 등록 기기에서만 유효하다. 그 서명으로 만든 DMG를
 #   남에게 주면 "악성 코드가 없음을 확인할 수 없습니다"가 뜬다. 경고 없는 배포는
@@ -79,6 +83,22 @@ WindowLayout $VERSION
 https://github.com/beliemun/window-layout
 TXT
 
+PROFILE=${NOTARY_PROFILE:-windowlayout}
+
+# 앱을 먼저 공증하고 티켓을 박아 둔다(stapler). DMG에서 꺼낸 앱도 오프라인에서 검증되도록.
+if [[ $NOTARIZE == 1 ]]; then
+  echo "📤 앱 공증 제출 중 (프로필: $PROFILE)… 몇 분 걸립니다."
+  ditto -c -k --sequesterRsrc --keepParent "$STAGE/WindowLayout.app" "$STAGE/notarize.zip"
+  xcrun notarytool submit "$STAGE/notarize.zip" --keychain-profile "$PROFILE" --wait
+  xcrun stapler staple "$STAGE/WindowLayout.app"
+  rm -f "$STAGE/notarize.zip"
+fi
+
+# 배포용 zip은 공증·스테이플이 끝난 앱으로 만든다.
+ZIP=dist/WindowLayout.app.zip
+rm -f "$ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$STAGE/WindowLayout.app" "$ZIP"
+
 rm -f "$DMG"
 hdiutil create -volname "WindowLayout $VERSION" \
   -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
@@ -86,21 +106,19 @@ hdiutil create -volname "WindowLayout $VERSION" \
 [[ -n "$IDENTITY" ]] && codesign --force --sign "$IDENTITY" --timestamp "$DMG" 2>/dev/null || true
 
 if [[ $NOTARIZE == 1 ]]; then
-  # 인증 정보는 미리 키체인 프로필로 저장해 둔다(한 번만):
-  #   xcrun notarytool store-credentials windowlayout \
-  #     --apple-id <Apple ID> --team-id <팀 ID> --password <앱 암호>
-  PROFILE=${NOTARY_PROFILE:-windowlayout}
-  echo "📤 공증 제출 중 (프로필: $PROFILE)… 몇 분 걸립니다."
+  echo "📤 DMG 공증 제출 중…"
   xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
   xcrun stapler staple "$DMG"
-  echo "📎 stapled"
+  echo "📎 stapled: 앱 + DMG"
 fi
 
 echo "✅ $DMG  ($(du -h "$DMG" | cut -f1))"
-if spctl -a -t open --context context:primary-signature "$DMG" >/dev/null 2>&1; then
-  echo "🟢 Gatekeeper 통과 — 다른 Mac에서 경고 없이 열립니다."
-else
-  echo "🟡 Gatekeeper 거부 — 받는 쪽에서 아래가 필요합니다:"
-  echo "     xattr -dr com.apple.quarantine <내려받은 dmg 경로>"
-  echo "   경고 없이 배포하려면 Developer ID 인증서로 ./scripts/make_dmg.sh --notarize"
-fi
+echo "✅ $ZIP  ($(du -h "$ZIP" | cut -f1))"
+for f in "$DMG" "$ZIP"; do
+  t=open; [[ "$f" == *.zip ]] && t=exec
+  if spctl -a -t $t --context context:primary-signature "$f" >/dev/null 2>&1; then
+    echo "🟢 $(basename "$f"): Gatekeeper 통과"
+  else
+    echo "🟡 $(basename "$f"): Gatekeeper 거부 — 받는 쪽에서 격리 속성 해제가 필요합니다."
+  fi
+done
